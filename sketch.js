@@ -1,92 +1,117 @@
-const MIN_COUNT = 15;
-const MAX_COUNT = 25;
-const DEFAULT_COUNT = 20;
+const TIMER_LIMITS = {
+  min: 15,
+  max: 25,
+  defaultValue: 20,
+};
+
+const EVENTS = {
+  DEC: "A",
+  INC: "B",
+  START: "S",
+  TICK: "Timeout",
+};
+
+const UI = {
+  dialSize: 250,
+  ringWeight: 20,
+  bigText: 100,
+  configText: 120,
+  helpText: 18,
+};
+
 
 class Temporizador extends FSMTask {
-  constructor() {
+  constructor(minValue, maxValue, defaultValue) {
     super();
-    this.counter = DEFAULT_COUNT;
-    this.maxCounter = MAX_COUNT;
-    this.myTimer = this.addTimer("Timeout", 1000);
-    this.stateName = "";
+
+    this.minValue = minValue;
+    this.maxValue = maxValue;
+    this.defaultValue = defaultValue;
+    this.configValue = defaultValue;
+    this.totalSeconds = defaultValue;
+    this.remainingSeconds = defaultValue;
+
+    this.myTimer = this.addTimer(EVENTS.TICK, 1000);
     this.transitionTo(this.estado_config);
 
   }
 
+  get currentState() {
+    return this.state;
+  }
+
   estado_config = (ev) => {
     if (ev === ENTRY) {
-      this.counter = DEFAULT_COUNT;
-      this.stateName = "config";
-    } else if (ev === "A") {
-      if (this.counter > MIN_COUNT) this.counter--;
-    } else if (ev === "B") {
-      if (this.counter < MAX_COUNT) this.counter++;
-    } else if (ev === "S") {
-      this.maxCounter = this.counter;
+      this.configValue = this.defaultValue;
+    }
+    else if (ev === EVENTS.DEC) {
+      if (this.configValue > this.minValue) this.configValue--;
+    } else if (ev === EVENTS.INC) {
+      if (this.configValue < this.maxValue) this.configValue++;
+    } else if (ev === EVENTS.START) {
+      this.totalSeconds = this.configValue;
+      this.remainingSeconds = this.totalSeconds;
       this.transitionTo(this.estado_armed);
     }
-  }
+  };
 
 
   estado_armed = (ev) => {
     if (ev === ENTRY) {
       this.myTimer.start();
-      this.stateName = "armed";
     } else if (ev === EXIT) {
       this.myTimer.stop();
-    }
-    else if (ev === "Timeout") {
-      if (this.counter > 0) {
-        this.counter--;
-        if (this.counter === 0) {
+    } else if (ev === EVENTS.TICK) {
+      if (this.remainingSeconds > 0) {
+        this.remainingSeconds--;
+        if (this.remainingSeconds === 0) {
           this.transitionTo(this.estado_timeout);
         } else {
           this.myTimer.start();
         }
       }
     }
-  }
+  };
 
   estado_timeout = (ev) => {
     if (ev === ENTRY) {
-      this.stateName = "timeout";
-    } else if (ev === "A") {
+      console.log("¡TIEMPO!");
+    } else if (ev === EVENTS.DEC) {
       this.transitionTo(this.estado_config);
     }
   }
 }
 
 let temporizador;
+const renderer = new Map();
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  temporizador = new Temporizador();
+  temporizador = new Temporizador(
+    TIMER_LIMITS.min,
+    TIMER_LIMITS.max,
+    TIMER_LIMITS.defaultValue
+  );
   textAlign(CENTER, CENTER);
+
+  renderer.set(temporizador.estado_config, () => drawConfig(temporizador.configValue));
+  renderer.set(temporizador.estado_armed, () => drawArmed(temporizador.remainingSeconds, temporizador.totalSeconds));
+  renderer.set(temporizador.estado_timeout, () => drawTimeout());
 }
 
 function draw() {
   temporizador.update();
-
-  //if (temporizador.stateName === "config") { ... }
-
-  let stateName = temporizador.state.name;
-
-  if (stateName.includes("estado_config")) {
-    drawConfig(temporizador.counter);
-  } else if (stateName.includes("estado_armed")) {
-    drawArmed(temporizador.counter, temporizador.maxCounter);
-  } else if (stateName.includes("estado_timeout")) {
-    drawTimeout();
-  }
+  renderer.get(temporizador.currentState)?.();
 }
 
 function drawConfig(val) {
   background(20, 40, 80);
   fill(255);
-  textSize(32);
   textSize(120);
   text(val, width / 2, height / 2);
-  textSize(20);
+  textSize(18);
+  fill(200);
+  text("A(-) B(+) S(start)", width / 2, height / 2 + 100);
 }
 
 function drawArmed(val, total) {
