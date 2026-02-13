@@ -59,8 +59,6 @@ class Temporizador extends FSMTask {
   estado_armed = (ev) => {
     if (ev === ENTRY) {
       this.myTimer.start();
-    } else if (ev === EXIT) {
-      this.myTimer.stop();
     } else if (ev === EVENTS.TICK) {
       if (this.remainingSeconds > 0) {
         this.remainingSeconds--;
@@ -70,7 +68,10 @@ class Temporizador extends FSMTask {
           this.myTimer.start();
         }
       }
+    } else if (ev === EXIT) {
+      this.myTimer.stop();
     }
+
   };
 
   estado_timeout = (ev) => {
